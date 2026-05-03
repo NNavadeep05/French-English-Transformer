@@ -161,4 +161,4 @@ def train_gru(train_loader, val_loader, tgt_vocab, epochs):
 
     torch.save(model.state_dict(), BEST_GRU_PATH)
     elapsed = time.time() - t0
-    return model, history, elapsed
+    return model, history, elapse
