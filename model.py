@@ -229,4 +229,4 @@ class GRUBaseline(nn.Module):
 
         dec_emb = self.dec_emb(tgt.long())
         out, _  = self.dec_gru(dec_emb, h)
-        return self.out_proj(out)
+        return self.out_proj(out
