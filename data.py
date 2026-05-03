@@ -138,4 +138,4 @@ def get_datasets():
     train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True,  collate_fn=_collate)
     val_loader   = DataLoader(val_ds,   batch_size=BATCH_SIZE, shuffle=False, collate_fn=_collate)
 
-    return train_loader, val_loader, src_vocab, tgt_voca
+    return train_loader, val_loader, src_vocab, tgt_vocab
