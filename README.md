@@ -28,6 +28,7 @@ Seq2seq transformer for French-to-English neural machine translation, trained on
 ## Dataset
 
 - Source: [Tatoeba Project](https://tatoeba.org) via `fra.txt`
+- Download fra.txt from https://www.manythings.org/anki/ (fra-eng.zip)
 - 175K French-English sentence pairs
 - 80/20 train-val split
 - 10,000 token vocabulary per language
