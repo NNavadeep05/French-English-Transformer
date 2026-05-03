@@ -20,6 +20,7 @@ class PositionalEncoding(nn.Module):
         pe[:, 0::2] = torch.sin(pos * div)
         pe[:, 1::2] = torch.cos(pos * div)
         pe = pe.unsqueeze(0)  # (1, max_len, d_model)
+        # register_buffer so pe moves with the model to GPU without being a trainable param
         self.register_buffer('pe', pe)
 
     def forward(self, x):
@@ -63,6 +64,8 @@ class DecoderLayer(nn.Module):
         self.norm1   = nn.LayerNorm(units)
         self.norm2   = nn.LayerNorm(units)
         self.norm3   = nn.LayerNorm(units)
+        # stored on the layer rather than returned so callers don't need to thread
+        # it through every stack level; only the last forward pass value is kept
         self.last_attention_weights = None
 
     def forward(self, x, memory, tgt_mask=None, tgt_key_padding_mask=None, memory_key_padding_mask=None):
@@ -89,6 +92,8 @@ class TransformerEncoder(nn.Module):
         self.layers    = nn.ModuleList([
             EncoderLayer(units, num_heads, dropout) for _ in range(num_layers)
         ])
+        # scaling by sqrt(d_model) prevents dot-product magnitudes from growing with
+        # embedding size, which would push softmax into near-zero gradient regions
         self.scale = math.sqrt(units)
 
     def forward(self, src, src_key_padding_mask=None):
@@ -132,7 +137,8 @@ class TransformerDecoder(nn.Module):
 
 
 def _causal_mask(size, device):
-    """Upper-triangular mask: True = positions to ignore."""
+    # triu with diagonal=1 zeros the main diagonal so each position can attend to
+    # itself; True entries are positions the attention mechanism must not see
     return torch.triu(torch.ones(size, size, device=device), diagonal=1).bool()
 
 
@@ -146,6 +152,8 @@ class Translator(nn.Module):
 
     def forward(self, src, tgt):
         device       = next(self.parameters()).device
+        # move inside forward rather than relying on the caller — avoids silent
+        # device mismatches when the model is on GPU but the DataLoader yields CPU tensors
         src          = src.long().to(device)
         tgt          = tgt.long().to(device)
         src_pad_mask = (src == 0).to(torch.bool)
@@ -215,6 +223,8 @@ class GRUBaseline(nn.Module):
         enc_emb = self.enc_emb(src.long())
         _, h    = self.enc_gru(enc_emb)           # h: (2, batch, 256)
         h       = torch.cat([h[0], h[1]], dim=-1) # (batch, 512)
+        # project the concatenated bi-GRU state to decoder hidden size; without this
+        # the forward/backward states would be passed as-is, ignoring their interaction
         h       = torch.tanh(self.enc_proj(h)).unsqueeze(0)  # (1, batch, 512)
 
         dec_emb = self.dec_emb(tgt.long())

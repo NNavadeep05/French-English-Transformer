@@ -1,6 +1,6 @@
 from data import get_datasets
 from train import train_transformer, train_gru
-from compare import print_comparison, plot_curves, plot_attention
+from compare import print_comparison, print_curves, print_attention
 from translate import run_demo
 
 
@@ -16,8 +16,8 @@ def main():
     gru, g_history, g_time = train_gru(train_loader, val_loader, tgt_vocab, actual_epochs)
 
     print_comparison(t_history, t_time, g_history, g_time)
-    plot_curves(t_history, g_history)
-    plot_attention(transformer, "C'est un jour merveilleux.", src_vocab, tgt_vocab)
+    print_curves(t_history, g_history)
+    print_attention(transformer, "C'est un jour merveilleux.", src_vocab, tgt_vocab)
 
     run_demo(transformer, src_vocab, tgt_vocab)
 

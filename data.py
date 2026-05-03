@@ -18,8 +18,10 @@ END_TOKEN   = '[END]'
 
 def normalize(text):
     text = unicodedata.normalize('NFKD', text)
+    # encode+decode strips accented chars that can't survive ASCII, keeping base letters
     text = text.encode('ascii', errors='ignore').decode('utf-8')
     text = text.lower()
+    # space-pad punctuation so "end." tokenizes as ["end", "."] not ["end."]
     text = re.sub(r'([!?.,])', r' \1 ', text)
     text = re.sub(r' +', ' ', text)
     return text.strip()
@@ -30,7 +32,8 @@ def build_vocab(sentences, max_tokens=MAX_VOCAB):
     for s in sentences:
         counter.update(s.split())
     special = [PAD_TOKEN, UNK_TOKEN, START_TOKEN, END_TOKEN]
-    # exclude specials from corpus words to avoid duplicates with fixed indices
+    # specials must occupy fixed indices 0-3; filtering them from counter prevents
+    # a corpus word like '[START]' from colliding with the reserved slot
     top_words = [
         w for w, _ in counter.most_common(max_tokens)
         if w not in set(special)
@@ -61,7 +64,8 @@ class TranslationDataset(Dataset):
         src_size = len(src_vocab)
         tgt_size = len(tgt_vocab)
         for src, tgt in zip(src_sentences, tgt_sentences):
-            # default to 1 (<unk>) for any token not in vocab, then clamp as safety
+            # val sentences may contain tokens absent from train vocab; map them to
+            # <unk>=1 rather than raising a KeyError or letting the index go OOB
             src_ids = [min(src_vocab.get(t, 1), src_size - 1) for t in src.split()]
             tgt_ids = [min(tgt_vocab.get(t, 1), tgt_size - 1) for t in tgt.split()]
             self.data.append((
@@ -78,9 +82,12 @@ class TranslationDataset(Dataset):
 
 def collate_fn(batch, src_vocab_size=None, tgt_vocab_size=None):
     src_batch, tgt_batch = zip(*batch)
+    # pad to the longest sequence in this batch, not a global max — keeps memory
+    # proportional to the actual content rather than the worst case in the dataset
     src_padded = pad_sequence(src_batch, batch_first=True, padding_value=0)
     tgt_padded = pad_sequence(tgt_batch, batch_first=True, padding_value=0)
-    # clamp any stray out-of-range indices to <unk>=1
+    # secondary clamp guards against any index that slipped past the Dataset-level
+    # unk mapping (e.g. if vocab was rebuilt with fewer tokens between runs)
     if src_vocab_size is not None:
         src_padded = src_padded.clamp(0, src_vocab_size - 1)
     if tgt_vocab_size is not None:
@@ -106,6 +113,8 @@ def get_datasets():
     val_fr   = [french_raw[i]  for i in range(n) if not mask[i]]
     val_en   = [english_raw[i] for i in range(n) if not mask[i]]
 
+    # vocab is built from train only — val tokens unseen during training map to <unk>,
+    # which is the correct behaviour for a closed-vocabulary NMT system
     src_vocab = build_vocab(train_fr)
     tgt_vocab = build_vocab(train_en)
 
@@ -115,7 +124,8 @@ def get_datasets():
     train_ds = TranslationDataset(train_fr, train_en, src_vocab, tgt_vocab)
     val_ds   = TranslationDataset(val_fr,   val_en,   src_vocab, tgt_vocab)
 
-    # verify no index escapes vocab bounds
+    # explicit bounds check catches any regression in build_vocab or tokenisation
+    # before the embedding layer surfaces it as a cryptic CUDA index error
     for ids, _ in train_ds.data:
         assert ids.max().item() < len(src_vocab), f'src OOB: {ids.max().item()} >= {len(src_vocab)}'
     for _, ids in train_ds.data:

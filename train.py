@@ -12,8 +12,9 @@ BEST_GRU_PATH   = r'C:\Users\kp\Desktop\AG\French to English Transformer\best_gr
 
 
 def masked_loss(logits, targets, pad_idx=0):
-    # logits: (batch, seq, vocab) → reshape for CrossEntropyLoss
     vocab_size = logits.size(-1)
+    # ignore_index=0 excludes <pad> positions from the loss gradient; without this
+    # the model would optimise to predict padding, inflating apparent accuracy
     loss_fn = nn.CrossEntropyLoss(ignore_index=pad_idx)
     return loss_fn(logits.reshape(-1, vocab_size), targets.reshape(-1))
 
@@ -38,6 +39,8 @@ def _run_epoch(model, loader, optimizer=None, is_transformer=True):
             src = src.to(device)
             tgt = tgt.to(device)
 
+            # teacher forcing: feed ground-truth prefix (tgt_in) and predict the next
+            # token (tgt_out); the one-position shift is what creates the prediction target
             tgt_in  = tgt[:, :-1]
             tgt_out = tgt[:, 1:]
 
@@ -51,6 +54,8 @@ def _run_epoch(model, loader, optimizer=None, is_transformer=True):
             if training:
                 optimizer.zero_grad()
                 loss.backward()
+                # clip gradients to prevent exploding gradient spikes common in
+                # attention models with large sequence lengths
                 nn.utils.clip_grad_norm_(model.parameters(), 1.0)
                 optimizer.step()
 
@@ -68,6 +73,7 @@ def _train_loop(model, train_loader, val_loader, save_path, patience=5, max_epoc
     history   = {'loss': [], 'acc': [], 'val_loss': [], 'val_acc': []}
 
     best_val_loss = float('inf')
+    # deepcopy so best_weights is a snapshot independent of further training updates
     best_weights  = copy.deepcopy(model.state_dict())
     no_improve    = 0
 
@@ -131,7 +137,8 @@ def train_transformer(train_loader, val_loader, src_vocab, tgt_vocab, units=UNIT
 
 
 def train_gru(train_loader, val_loader, tgt_vocab, epochs):
-    # infer src vocab size from the loader
+    # GRUBaseline is a fixed-capacity baseline; matching MAX_VOCAB keeps it
+    # comparable to the transformer without passing src_vocab through the API
     src_size = 10000
     tgt_size = len(tgt_vocab)
 
