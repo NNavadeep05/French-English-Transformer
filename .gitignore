@@ -5,4 +5,4 @@ __pycache__/
 fra.txt
 training_log.txt
 venv/
-
+.env
