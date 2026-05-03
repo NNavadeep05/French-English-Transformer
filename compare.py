@@ -64,4 +64,4 @@ def print_attention(model, sentence, src_vocab, tgt_vocab):
     for r in range(rows):
         row_label = tgt_tokens[r].ljust(10)
         weights   = '  '.join(f'{attn[r, c].item():.3f}'.ljust(col_w) for c in range(cols))
-        print(f'{row_label}  {weights}')
+        print(f'{row_label}  {weights}'
