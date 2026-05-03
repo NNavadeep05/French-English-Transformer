@@ -15,4 +15,4 @@ def run_demo(transformer, src_vocab, tgt_vocab):
     for fr, en in zip(DEMO_SENTENCES, translations):
         print(f'French  : {fr}')
         print(f'English : {en}')
-        print(
+        print()
