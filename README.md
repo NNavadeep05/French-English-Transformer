@@ -84,4 +84,4 @@ Outputs:
 - Optimizer: Adam
 - Loss: masked sparse categorical crossentropy
 - Early stopping: patience 5 on val loss
-- Device: CUDA if available, else CPU
+- Device: CUDA if available, else CPU.
